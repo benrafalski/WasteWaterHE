@@ -1,3 +1,4 @@
+from statistics import mean
 import time
 import pandas as pd 
 import tenseal as ts
@@ -42,9 +43,11 @@ def read_data(file):
 
 def context():
     poly_mod_degree = 8192*2
-    coeff_mod_bit_sizes = [60, 50, 50, 50, 60]		
+    # coeff_mod_bit_sizes = [60, 50, 50, 50, 60]	
+    coeff_mod_bit_sizes = [60, 40, 40, 40, 60]		
     ctx = ts.context(ts.SCHEME_TYPE.CKKS, poly_mod_degree, -1, coeff_mod_bit_sizes)
-    ctx.global_scale = pow(2, 50)
+    # ctx.global_scale = pow(2, 50)
+    ctx.global_scale = pow(2, 40)
     ctx.generate_galois_keys()
     return ctx
 
@@ -73,6 +76,9 @@ def he(area_conc, area_flows):
     CONST1 = np.array([0.85]*7)
     CONST2 = np.array([0.15]*7)
 
+    Y = np.array([6]*7)
+    X = np.array([6]*7)
+
     np.set_printoptions(suppress=True,
     formatter={'float_kind':'{:0.3f}'.format})
     C_T1_ENC = ts.ckks_vector(ctx, C_T1)
@@ -96,21 +102,37 @@ def he(area_conc, area_flows):
     CONST1_ENC = ts.ckks_vector(ctx, CONST1)
     CONST2_ENC = ts.ckks_vector(ctx, CONST2)
 
+    Y_ENC = ts.ckks_vector(ctx, Y)
+    X_ENC = ts.ckks_vector(ctx, X)
+    
+    e = Y_ENC - X_ENC
+    print(Y_ENC.decrypt())
+    print(X_ENC.decrypt())
+
+    if(Y_ENC == X_ENC):
+        print("HI")
+    else:
+        print("HI^")
+
+
     start = time.time()
     area1 = (C_T1*D_T1) - (A_M1*B_M1) - (A_M2*(B_M2*0.15)) - (C_DT*D_DT) - (C_CR*D_CR)
     area1_enc = (C_T1_ENC*D_T1_ENC) - (A_M1_ENC*B_M1_ENC) - (A_M2_ENC*(B_M2_ENC*CONST2_ENC)) - (C_DT_ENC*D_DT_ENC) - (C_CR_ENC*D_CR_ENC)
     print(f'\nArea 1 Expected: {area1.tolist()}')
     print(f'Area 1 Actual:   {area1_enc.decrypt()}')
+    print(f'Differences {np.subtract(np.array(area1.tolist()), np.array(area1_enc.decrypt()))}')
 
     area2 = (C_T2*D_T2) - (C_S*D_S)
     area2_enc = (C_T2_ENC*D_T2_ENC) - (C_S_ENC*D_S_ENC)
     print(f'\nArea 2 Expected: {area2.tolist()}')
     print(f'Area 2 Actual:   {area2_enc.decrypt()}')
+    print(f'Differences {np.subtract(np.array(area1.tolist()), np.array(area1_enc.decrypt()))}')
 
     area3 = ((C_T3*D_T3) - (A_M2*(B_M2*CONST1))) - (E-F)
     area3_enc = ((C_T3_ENC*D_T3_ENC) - (A_M2_ENC*(B_M2_ENC*CONST1_ENC))) - (E_ENC-F_ENC)
     print(f'\nArea 3 Expected: {area3.tolist()}')
     print(f'Area 3 Actual:   {area3_enc.decrypt()}')
+    print(f'Differences {np.subtract(np.array(area1.tolist()), np.array(area1_enc.decrypt()))}')
 
     print(f'\nComputation time: {(time.time()-start)*1000} ms')
 
